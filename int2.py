@@ -299,7 +299,7 @@ if result:
     dfs_by_category, tire_categories = create_training_dataframe(df, df_vacances, df_feries, df_inflation)
     
     # Charger le modèle sauvegardé
-    model_charge = load_model("modele_AE_V1.keras")
+    model_charge = load_model("modele_AE_V1.h5")
 
     feature_cols = ['Jours_Sem', 'Jours_Mois', 'Mois', 'Annee', 'Inflation_Annee_N-0', 'Inflation_Annee_N-1', 'Inflation_Annee_N-2', 'Inflation_Annee_N-3', 'Inflation_Annee_N-4', 'Inflation_Annee_N-5', 'Vacances', 'Feries']
     target_col = 'Poids Net Collecté'
