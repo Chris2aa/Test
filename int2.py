@@ -245,7 +245,13 @@ def plot_predictions_mens(category, y_test, y_pred, dfs_by_category):
     recap_table.columns = ['Valeurs réelles', 'Valeurs prédites']
 
     # 6.1 Arrondir les valeurs à un chiffre après la virgule
+    # Convertir en float si nécessaire
+    recap_table['Valeurs réelles'] = recap_table['Valeurs réelles'].astype(float)
+    recap_table['Valeurs prédites'] = recap_table['Valeurs prédites'].astype(float)
+
+    # Appliquer l'arrondi
     recap_table = recap_table.round(1)
+
     
     # 6.2 Formater la colonne Date
     recap_table.index = recap_table.index.strftime('%m/%Y')
@@ -279,19 +285,39 @@ def plot_predictions_mens_futur(y_test, y_pred, time_labels, title):
     df_real_monthly = df_real.groupby('Month')['Real'].sum().reset_index()
     df_pred_monthly = df_pred.groupby('Month')['Pred'].sum().reset_index()
 
-    # 4. Générer les histogrammes
+    # Exclure le premier mois
+    df_real_monthly = df_real_monthly.iloc[1:]
+    df_pred_monthly = df_pred_monthly.iloc[1:]
+
+    # Générer les histogrammes
     plt.figure(figsize=(15, 6))
     plt.bar(df_real_monthly['Month'].astype(str), df_real_monthly['Real'], alpha=0.6, label='Valeurs réelles')
-    plt.bar(df_pred_monthly['Month'].astype(str), df_pred_monthly['Pred'], alpha=0.6, label='Valeurs prédites')
+    plt.bar(df_pred_monthly['Month'].astype(str), df_pred_monthly['Pred'], alpha=0.6, color='blue', label='Valeurs prédites')
+
+    # Ajouter les valeurs sur les barres
+    for i, value in enumerate(df_real_monthly['Real']):
+        plt.text(i, value, str(round(value, 1)), ha='center')
+    for i, value in enumerate(df_pred_monthly['Pred']):
+        plt.text(i, value, str(round(value, 1)), ha='center')
+
+   
+
+    z = np.polyfit(range(len(df_real_monthly['Real'])), df_real_monthly['Real'], 1)
+    p = np.poly1d(z)
+    plt.plot(df_real_monthly['Month'].astype(str), p(range(len(df_real_monthly['Real']))), "r--")
+
 
     plt.title(title)
     plt.xlabel('Mois')
     plt.ylabel('Tonnage')
-    plt.legend()
+    plt.legend().remove()
     plt.tight_layout()
     st.pyplot(plt)
 
-
+@st.cache_resource
+def load_my_model():
+    model = load_model('modele_AE_V1.h5')
+    return model
 
 result = load_files()
 if result:
@@ -299,7 +325,8 @@ if result:
     dfs_by_category, tire_categories = create_training_dataframe(df, df_vacances, df_feries, df_inflation)
     
     # Charger le modèle sauvegardé
-    model_charge = load_model("modele_AE_V1.h5")
+    #model_charge = load_model("modele_AE_V1.h5")
+    model_charge = load_my_model()
 
     feature_cols = ['Jours_Sem', 'Jours_Mois', 'Mois', 'Annee', 'Inflation_Annee_N-0', 'Inflation_Annee_N-1', 'Inflation_Annee_N-2', 'Inflation_Annee_N-3', 'Inflation_Annee_N-4', 'Inflation_Annee_N-5', 'Vacances', 'Feries']
     target_col = 'Poids Net Collecté'
@@ -321,7 +348,7 @@ if result:
     # Afficher le tableau récapitulatif dans Streamlit
     #display_summary_table(tire_categories[0], y_test, y_pred)
     # Ensuite, vous pouvez continuer avec le reste de votre code.
-    future_dates_range = ('2023-09-01', '2023-12-31')
+    future_dates_range = ('2023-08-01', '2023-12-31')
     future_df = create_prediction_dataframe(df, df_vacances, df_feries, df_inflation, future_dates_range)
     # Préparez future_df pour la prédiction
     X_future, _ = prepare_data_for_lstm(future_df, feature_cols, target_col=None, sequence_length=sequence_length)
@@ -332,7 +359,7 @@ if result:
     #plot_predictions_mens(tire_categories[0],y_future_pred, y_future_pred, future_df)
 
     # Utilisation de la fonction modifiée avec future_df
-    time_labels = pd.date_range(start='2023-09-01', end='2023-12-31', freq='D')
+    time_labels = pd.date_range(start='2023-08-01', end='2023-12-31', freq='D')
     y_future_pred = model_charge.predict(X_future)  # Supposé que X_future a été bien préparé
     plot_predictions_mens_futur(y_future_pred, y_future_pred, time_labels, 'Prédictions futures de tonnage')
     # Afficher le tableau récapitulatif dans Streamlit
@@ -341,27 +368,3 @@ if result:
 else:
     st.warning("Aucun fichier n'a été chargé, impossible de continuer.")
 
-def display_summary_table(category, y_test, y_pred):
-    # Convertir les données en DataFrame pour le resampling
-    df_daily = pd.DataFrame({'Valeurs réelles': y_test.flatten(), 'Valeurs prédites': y_pred.flatten()})
-    df_daily.index = pd.date_range(start='2022-07-01', periods=len(y_test), freq='D')  # Ajustez la date de début selon vos données
-
-    # Regrouper les données par mois
-    df_monthly = df_daily.resample('M').sum()
-    
-    # Calculer le % d'erreur
-    df_monthly['error_percent'] = ((df_monthly['Valeurs prédites'] - df_monthly['Valeurs réelles']) / df_monthly['Valeurs réelles']) * 100
-    
-    # Calculer la somme des valeurs prédites et réelles, et le % d'erreur total
-    total_real = df_monthly['Valeurs réelles'].sum()
-    total_pred = df_monthly['Valeurs prédites'].sum()
-    total_error_percent = ((total_pred - total_real) / total_real) * 100
-    
-    # Afficher le tableau dans Streamlit
-    st.write(f"## Tableau récapitulatif mensuel pour la catégorie {category}")
-    st.table(df_monthly)
-    
-    # Afficher les totaux et le % d'erreur avec une police plus petite
-    st.markdown(f"<h3 style='font-size:16px'>Total valeurs réelles : {total_real:.2f}</h3>", unsafe_allow_html=True)
-    st.markdown(f"<h3 style='font-size:16px'>Total valeurs prédites : {total_pred:.2f}</h3>", unsafe_allow_html=True)
-    st.markdown(f"<h3 style='font-size:16px'>erreur total : {total_error_percent:.2f}%</h3>", unsafe_allow_html=True)
