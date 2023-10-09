@@ -30,13 +30,13 @@ def convert_and_clean_date(df, col_name):
 # 1. Fonction pour l'importation des données
 def load_files():
     # Chargement du fichier principal via Streamlit
-    uploaded_file = st.file_uploader("Choisir le fichier principal (test2.xlsx)", type="xlsx", key="main_file_uploader")
+    uploaded_file = st.file_uploader("Choisir le fichier de données", type="xlsx", key="main_file_uploader")
 
     if uploaded_file is not None:
         df = pd.read_excel(uploaded_file)
         st.write("Aperçu des données principales", df.head())
     else:
-        st.warning('...')
+        st.warning('')
         return None
     
     # Chargement des fichiers supplémentaires
